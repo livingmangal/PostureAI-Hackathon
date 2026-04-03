@@ -6,9 +6,8 @@ const Navbar = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: "/", label: "POSTURE AI" },
-    { path: "/health", label: "HEALTH MODULE" },
-    // { path: "/dashboard", label: "DASHBOARD" },
+    { path: "/", label: "POSTURE AI", icon: "🧠" },
+    { path: "/health", label: "HEALTH MODULE", icon: "💊" },
   ];
 
   return (
@@ -22,6 +21,7 @@ const Navbar = () => {
               to={item.path}
               className={`nav-item ${isActive ? "active" : ""}`}
             >
+              <span className="nav-icon">{item.icon}</span>
               <span className="nav-text">{item.label}</span>
             </Link>
           );

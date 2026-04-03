@@ -1,18 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import "./PostureCamera.css";
 
-export default function PostureCamera() {
+// ── Modular imports ──
+import { DEFAULT_RESULT } from "../posture/types";
+import { analyzePosture } from "../posture/analyzer";
+import { drawPose } from "../posture/drawing";
+import { getInsight } from "../utils/insights";
+import { useToast } from "../hooks/useToast";
+import { useSettings } from "../features/settings/SettingsContext";
+import { sessionTracker } from "../analytics/sessionTracker";
+import { saveSession } from "../analytics/storage";
+import { exportSessionCSV } from "../utils/exportReport";
+import { checkAchievements, getAllAchievements } from "../features/gamification/achievements";
+import { getSessions } from "../analytics/storage";
+
+import SessionSummary from "../features/sessionSummary/SessionSummary";
+import AchievementToast from "../features/gamification/AchievementToast";
+
+export default function PostureCamera({ isPaused, isFullscreen }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // ── Settings ──
+  const { settings } = useSettings();
+
+  // ── Sound ──
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(isMuted);
-  useEffect(() => {
-    isMutedRef.current = isMuted;
-  }, [isMuted]);
-
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   const lastSpokenRef = useRef(0);
 
-  const [status, setStatus] = useState("Initializing...");
+  // ── Posture state ──
+  const [isCalibrating, setIsCalibrating] = useState(true);
+  const [postureResult, setPostureResult] = useState(DEFAULT_RESULT);
   const [score, setScore] = useState(100);
   const [streak, setStreak] = useState(0);
   const [goodFrames, setGoodFrames] = useState(0);
@@ -22,24 +42,41 @@ export default function PostureCamera() {
   const streakRef = useRef(0);
   const goodRef = useRef(0);
   const totalRef = useRef(0);
+  const maxStreakRef = useRef(0);
 
   const [badPostureTime, setBadPostureTime] = useState(0);
-  const [showAlert, setShowAlert] = useState(false);
 
-  const getAngle = (p1, p2) => {
-    return Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
-  };
+  // ── Toast notifications ──
+  const { toasts, showToast, dismissToast } = useToast();
 
-  const getInsight = (score, streak) => {
-    if (score >= 90 && streak >= 10) return "Outstanding form — keep it up! 🔥";
-    if (score >= 80) return "Great alignment detected.";
-    if (score >= 60) return "Minor adjustments needed.";
-    if (score >= 40) return "Chin up, shoulders back!";
-    return "Significant slouch detected — correct now.";
-  };
+  // ── Session summary ──
+  const [showSummary, setShowSummary] = useState(false);
 
+  // ── Achievements ──
+  const [newAchievements, setNewAchievements] = useState([]);
+
+  // ── Pause ref ──
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+
+  // ── Speech helper ──
+  const speakAlert = useCallback((message) => {
+    if (isMutedRef.current || !settings.voiceEnabled) return;
+    const now = Date.now();
+    if (now - lastSpokenRef.current < settings.voiceCooldown * 1000) return;
+
+    window.speechSynthesis.cancel();
+    const speech = new SpeechSynthesisUtterance(message);
+    speech.rate = settings.voiceRate;
+    speech.pitch = settings.voicePitch;
+    window.speechSynthesis.speak(speech);
+    lastSpokenRef.current = now;
+  }, [settings.voiceEnabled, settings.voiceRate, settings.voicePitch, settings.voiceCooldown]);
+
+  // ── Main detection loop ──
   useEffect(() => {
     let detector;
+    let animFrameId;
 
     const init = async () => {
       const tf = window.tf;
@@ -50,9 +87,7 @@ export default function PostureCamera() {
 
       detector = await posedetection.createDetector(
         posedetection.SupportedModels.MoveNet,
-        {
-          modelType: posedetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-        },
+        { modelType: posedetection.movenet.modelType.SINGLEPOSE_LIGHTNING },
       );
 
       const video = videoRef.current;
@@ -60,131 +95,116 @@ export default function PostureCamera() {
       video.srcObject = stream;
       await video.play();
 
+      setTimeout(() => setIsCalibrating(false), 2500);
+
+      sessionTracker.reset();
       detect(detector);
     };
 
-    const speakAlert = (message) => {
-      if (isMutedRef.current) return;
-
-      const now = Date.now();
-
-      // ⛔ cooldown (10 sec)
-      if (now - lastSpokenRef.current < 10000) return;
-
-      window.speechSynthesis.cancel(); // Stop previous voice
-      const speech = new SpeechSynthesisUtterance(message);
-      speech.rate = 1;
-      speech.pitch = 1;
-
-      window.speechSynthesis.speak(speech);
-
-      lastSpokenRef.current = now;
-    };
-
-    const detect = async (detector) => {
+    const detect = async (det) => {
       const video = videoRef.current;
 
       const loop = async () => {
-        if (video.readyState === 4) {
-          const poses = await detector.estimatePoses(video);
+        if (video.readyState === 4 && !isPausedRef.current) {
+          const poses = await det.estimatePoses(video);
 
           if (poses.length > 0) {
-            const { posture, angle } = checkPosture(poses[0]);
+            const result = analyzePosture(poses[0]);
+            setPostureResult(result);
 
-            setStatus(`${posture} | ${angle.toFixed(1)}°`);
-            drawPose(poses[0], posture);
+            const { primary, issues } = result;
+            const isGoodFrame = primary.level === "good";
+
+            const ctx = canvasRef.current.getContext("2d");
+            drawPose(ctx, poses[0], primary.level);
 
             totalRef.current += 1;
             setTotalFrames(totalRef.current);
 
-            if (posture.includes("Good")) {
+            if (isGoodFrame) {
               setScore((prev) => Math.min(prev + 0.5, 100));
               streakRef.current += 1;
               goodRef.current += 1;
+              if (streakRef.current > maxStreakRef.current) {
+                maxStreakRef.current = streakRef.current;
+              }
+            } else if (primary.level === "warning") {
+              setScore((prev) => Math.max(prev - 0.3, 0));
             } else {
               setScore((prev) => Math.max(prev - 1, 0));
               streakRef.current = 0;
             }
 
-            // Trigger Voice in Detection Loop
-            if (posture.includes("Slouching")) {
-              speakAlert("Fix your posture");
+            if (primary.voice) {
+              speakAlert(primary.voice);
             }
 
-            // Track Bad Posture Duration
-            // ✅ REAL-TIME counter (correct way)
             let newBadTime = badPostureTime;
-
-            if (posture.includes("Slouching")) {
+            if (primary.level === "bad") {
               newBadTime += 1;
             } else {
               newBadTime = 0;
-              setShowAlert(false);
             }
-
             setBadPostureTime(newBadTime);
 
-            // ✅ Trigger alert AFTER updating value
-            if (newBadTime > 150) {
-              setShowAlert(true);
-              speakAlert("Fix your posture");
+            if (newBadTime > 150 && newBadTime % 150 === 1) {
+              const issueNames = issues.map((i) => i.label).join(" & ");
+              showToast(`Persistent issue: ${issueNames} — correct now!`);
             }
 
             setStreak(streakRef.current);
             setGoodFrames(goodRef.current);
-            setInsight(getInsight(Math.round(score), streakRef.current));
+            setInsight(getInsight(Math.round(score), streakRef.current, issues));
+
+            // Record frame for analytics
+            sessionTracker.recordFrame(result, score);
           }
         }
 
-        requestAnimationFrame(loop);
+        animFrameId = requestAnimationFrame(loop);
       };
 
       loop();
     };
 
     init();
+    return () => {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      window.speechSynthesis.cancel();
+    };
   }, []);
 
-  const checkPosture = (pose) => {
-    const keypoints = pose.keypoints;
-    const nose = keypoints.find((k) => k.name === "nose");
-    const leftShoulder = keypoints.find((k) => k.name === "left_shoulder");
-    const rightShoulder = keypoints.find((k) => k.name === "right_shoulder");
+  // ── End session handler ──
+  const handleEndSession = useCallback(() => {
+    const stats = sessionTracker.getStats();
+    saveSession(stats);
 
-    if (!nose || !leftShoulder || !rightShoulder) {
-      return { posture: "Detecting...", angle: 0 };
-    }
-
-    const midShoulder = {
-      x: (leftShoulder.x + rightShoulder.x) / 2,
-      y: (leftShoulder.y + rightShoulder.y) / 2,
+    // Check achievements
+    const allSessions = getSessions();
+    const achContext = {
+      totalSessions: allSessions.length,
+      goodStreak: maxStreakRef.current,
+      maxStreak: maxStreakRef.current,
+      avgScore: stats.avgScore,
+      sessionDuration: stats.duration,
+      badPercent: stats.badPercent,
+      totalFrames: stats.totalFrames,
     };
-
-    const angle = getAngle(midShoulder, nose);
-    let posture = "Slouching ❌";
-    if (angle >= -95 && angle <= -65) {
-      posture = "Good Posture ✅";
+    const unlocked = checkAchievements(achContext);
+    if (unlocked.length > 0) {
+      setNewAchievements(unlocked);
     }
-    return { posture, angle };
-  };
 
-  const drawPose = (pose, posture) => {
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.clearRect(0, 0, 640, 480);
+    setShowSummary(true);
+  }, []);
 
-    pose.keypoints.forEach((kp) => {
-      if (kp.score > 0.5) {
-        ctx.beginPath();
-        ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
-        ctx.fillStyle = posture.includes("Good") ? "#00ff88" : "#ff3b6b";
-        ctx.shadowColor = posture.includes("Good") ? "#00ff88" : "#ff3b6b";
-        ctx.shadowBlur = 10;
-        ctx.fill();
-      }
-    });
-  };
+  const handleExport = useCallback(() => {
+    exportSessionCSV(sessionTracker.getRawData());
+  }, []);
 
-  const isGood = status.includes("Good");
+  // ── Computed values ──
+  const { primary, issues, neckAngle, shoulderTilt, headTilt } = postureResult;
+  const level = primary.level;
   const scoreRounded = Math.round(score);
   const accuracy =
     totalFrames > 0 ? Math.round((goodFrames / totalFrames) * 100) : 0;
@@ -200,140 +220,181 @@ export default function PostureCamera() {
         ? "var(--accent-amber)"
         : "var(--accent-red)";
 
+  const badgeClass = level === "good" ? "good" : level === "warning" ? "warning" : "bad";
+  const statusDisplay = primary.label === "Detecting…"
+    ? "Detecting…"
+    : `${primary.emoji} ${primary.label}`;
+
   return (
     <>
-      {/* Camera Panel */}
-      <div className="camera-panel">
-        <div className="camera-label">
-          <div className="camera-label-dot" />
-          Live Feed — Camera 01
-        </div>
-        <div className="camera-wrap">
-          <video ref={videoRef} />
-          <canvas ref={canvasRef} width="640" height="480" />
-          <div className="corner corner-tl" />
-          <div className="corner corner-tr" />
-          <div className="corner corner-bl" />
-          <div className="corner corner-br" />
-          <div className={`posture-badge ${isGood ? "good" : "bad"}`}>
-            {status}
-          </div>
-        </div>
-      </div>
-      {showAlert && (
-        <div className="absolute top-5 right-5 bg-red-500/90 text-white px-6 py-3 rounded-xl shadow-lg animate-pulse">
-          ⚠️ Fix your posture!
-        </div>
+      {/* ── Achievement Toast ── */}
+      {newAchievements.length > 0 && (
+        <AchievementToast
+          achievements={newAchievements}
+          onDone={() => setNewAchievements([])}
+        />
       )}
 
-      {/* Right Panel */}
-      <div className="right-panel">
-        {/* Score Circle */}
-        <div className="metric-card">
-          <div className="card-label">Posture Score</div>
-          <div className="score-circle-wrap">
-            <div className="score-outer">
-              <svg
-                className="score-svg"
-                width="140"
-                height="140"
-                viewBox="0 0 140 140"
-              >
-                <circle className="score-track" cx="70" cy="70" r={radius} />
-                <circle
-                  className="score-fill"
-                  cx="70"
-                  cy="70"
-                  r={radius}
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                  stroke={scoreColor}
-                />
-              </svg>
-              <div className="score-center">
-                <span className="score-number" style={{ color: scoreColor }}>
-                  {scoreRounded}
-                </span>
-                <span className="score-label">/ 100</span>
+      {/* ── Session Summary Modal ── */}
+      {showSummary && (
+        <SessionSummary
+          stats={sessionTracker.getStats()}
+          onClose={() => setShowSummary(false)}
+          onExport={handleExport}
+        />
+      )}
+
+      {/* ── Toast Notifications ── */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            <span className="toast-icon">⚠️</span>
+            <span>{toast.message}</span>
+            <button className="toast-dismiss" onClick={() => dismissToast(toast.id)}>×</button>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Main Layout Container ── */}
+      <div className="camera-layout">
+        {/* ── Camera Panel ── */}
+        <div className={`camera-panel ${isFullscreen ? "camera-fullscreen" : ""}`}>
+          <div className="camera-label">
+            <div className="camera-label-dot" />
+            Live Feed — Camera 01
+            {isPaused && <span className="camera-paused-badge">⏸ PAUSED</span>}
+          </div>
+          <div className="camera-wrap">
+            <video ref={videoRef} />
+            <canvas ref={canvasRef} width="640" height="480" />
+            <div className="corner corner-tl" />
+            <div className="corner corner-tr" />
+            <div className="corner corner-bl" />
+            <div className="corner corner-br" />
+            <div className={`posture-badge ${badgeClass}`}>
+              {statusDisplay}
+            </div>
+
+            {isCalibrating && (
+              <div className="calibrating-overlay">
+                <div className="calibrating-spinner" />
+                <div className="calibrating-text">Calibrating Camera</div>
+                <div className="calibrating-sub">
+                  Sit upright and face the camera. Detection will start automatically.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right Panel (Dashboard) ── */}
+        {!isFullscreen && (
+          <div className="right-panel">
+            {/* Score Circle */}
+            <div className="metric-card">
+              <div className="card-label">Posture Score</div>
+              <div className="score-circle-wrap">
+                <div className="score-outer">
+                  <svg className="score-svg" width="140" height="140" viewBox="0 0 140 140">
+                    <circle className="score-track" cx="70" cy="70" r={radius} />
+                    <circle
+                      className="score-fill"
+                      cx="70" cy="70" r={radius}
+                      strokeDasharray={circumference}
+                      strokeDashoffset={dashOffset}
+                      stroke={scoreColor}
+                    />
+                  </svg>
+                  <div className="score-center">
+                    <span className="score-number" style={{ color: scoreColor }}>{scoreRounded}</span>
+                    <span className="score-label">/ 100</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-        <button
-          onClick={() => setIsMuted(!isMuted)}
-          className="sound-toggle-btn"
-        >
-          {isMuted ? "🔇 Muted" : "🔊 Sound On"}
-        </button>
-        {/* <button
-          onClick={() => {
-            const nextState = !isMuted;
-            setIsMuted(nextState);
-            if (nextState) window.speechSynthesis.cancel(); // Shut up immediately
-          }}
-          className={`px-6 py-2 rounded-lg border transition-all ${
-            isMuted
-              ? "bg-red-500/10 border-red-500/50 text-red-400"
-              : "bg-cyan-500/10 border-cyan-500/50 text-cyan-400"
-          }`}
-        >
-          {isMuted ? "🔇 Muted" : "🔊 Sound On"}
-        </button> */}
 
-        {/* Status */}
-        <div className="metric-card">
-          <div className="card-label">Current Status</div>
-          <div className="status-row">
-            <div className={`status-indicator ${isGood ? "good" : "bad"}`} />
-            <span className={`status-text ${isGood ? "good" : "bad"}`}>
-              {isGood
-                ? "Good Posture"
-                : status.includes("Detecting")
-                  ? "Detecting…"
-                  : "Slouching"}
-            </span>
-          </div>
-          <div className="angle-display">
-            {status.includes("|")
-              ? `Neck angle: ${status.split("|")[1]?.trim()}`
-              : "Calibrating…"}
-          </div>
-          <div className="accuracy-bar-bg">
-            <div
-              className="accuracy-bar-fill"
-              style={{ width: `${accuracy}%` }}
-            />
-          </div>
-          <div className="accuracy-label">
-            <span>Session Accuracy</span>
-            <span>{accuracy}%</span>
-          </div>
-        </div>
+            {/* Controls row */}
+            <div className="controls-row">
+              <button
+                onClick={() => {
+                  const nextState = !isMuted;
+                  setIsMuted(nextState);
+                  if (nextState) window.speechSynthesis.cancel();
+                }}
+                className={`sound-toggle-btn ${isMuted ? "muted" : ""}`}
+              >
+                {isMuted ? "🔇 Muted" : "🔊 Sound On"}
+              </button>
+              <button className="end-session-btn" onClick={handleEndSession}>
+                📊 End Session
+              </button>
+            </div>
 
-        {/* Streak */}
-        <div className="metric-card">
-          <div className="card-label">Good Posture Streak</div>
-          <div className="streak-row">
-            <span className="streak-number">{streak}</span>
-            <span className="streak-unit">FRAMES</span>
-          </div>
-          <div className="streak-sub">
-            {streak >= 30
-              ? "🔥 On fire!"
-              : streak >= 10
-                ? "⚡ Building momentum"
-                : "Hold steady to build streak"}
-          </div>
-        </div>
+            {/* Status */}
+            <div className="metric-card">
+              <div className="card-label">Current Status</div>
+              <div className="status-row">
+                <div className={`status-indicator ${badgeClass}`} />
+                <span className={`status-text ${badgeClass}`}>{statusDisplay}</span>
+              </div>
 
-        {/* Insight */}
-        <div className="metric-card">
-          <div className="card-label">AI Insight</div>
-          <span className="insight-icon">
-            {scoreRounded >= 80 ? "✅" : scoreRounded >= 50 ? "⚠️" : "🚨"}
-          </span>
-          <div className="insight-text">{insight}</div>
-        </div>
+              {issues.length > 0 && (
+                <div className="issues-list">
+                  {issues.map((issue, i) => (
+                    <span key={i} className={`issue-tag ${issue.level}`}>
+                      {issue.emoji} {issue.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="angle-display">
+                {primary.label !== "Detecting…" ? (
+                  <>
+                    Neck: {neckAngle.toFixed(1)}°
+                    {shoulderTilt > 0 && <> · Shoulder tilt: {shoulderTilt.toFixed(0)}px</>}
+                    {headTilt > 0 && <> · Head tilt: {headTilt.toFixed(0)}px</>}
+                  </>
+                ) : (
+                  "Calibrating…"
+                )}
+              </div>
+
+              <div className="accuracy-bar-bg">
+                <div className="accuracy-bar-fill" style={{ width: `${accuracy}%` }} />
+              </div>
+              <div className="accuracy-label">
+                <span>Session Accuracy</span>
+                <span>{accuracy}%</span>
+              </div>
+            </div>
+
+            {/* Streak */}
+            <div className="metric-card">
+              <div className="card-label">Good Posture Streak</div>
+              <div className="streak-row">
+                <span className="streak-number">{streak}</span>
+                <span className="streak-unit">FRAMES</span>
+              </div>
+              <div className="streak-sub">
+                {streak >= 30
+                  ? "🔥 On fire!"
+                  : streak >= 10
+                    ? "⚡ Building momentum"
+                    : "Hold steady to build streak"}
+              </div>
+            </div>
+
+            {/* Insight */}
+            <div className="metric-card">
+              <div className="card-label">AI Insight</div>
+              <span className="insight-icon">
+                {scoreRounded >= 80 ? "✅" : scoreRounded >= 50 ? "⚠️" : "🚨"}
+              </span>
+              <div className="insight-text">{insight}</div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
