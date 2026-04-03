@@ -6,7 +6,14 @@ const STRETCHES = [
   { emoji: "🧘", name: "Seated Twist", desc: "Twist torso left, hold 10s, then right. Repeat 3x" },
   { emoji: "👐", name: "Wrist Circles", desc: "Extend arms, rotate wrists 10x each direction" },
   { emoji: "🦵", name: "Standing Stretch", desc: "Stand up, reach for the ceiling, hold 10 seconds" },
-  { emoji: "👁️", name: "Eye Break", desc: "Look at something 20ft away for 20 seconds (20-20-20 rule)" },
+  { emoji: "👁️", name: "Eye Break", desc: "Look at something 20 feet away for 20 seconds" },
+];
+
+const MESSAGES = [
+  "Take a breath. Roll your shoulders. You've got this.",
+  "A moment of stillness is a gift to your body.",
+  "Step away gently — you deserve this pause.",
+  "Your body is asking for a little kindness right now.",
 ];
 
 export default function BreakOverlay({ onSnooze, onDismiss }) {
@@ -18,33 +25,27 @@ export default function BreakOverlay({ onSnooze, onDismiss }) {
   }
   [...indices].forEach((i) => picks.push(STRETCHES[i]));
 
+  const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+
   return (
     <div className="break-overlay">
-      <div className="break-modal">
-        <div className="break-icon">⏰</div>
-        <h2 className="break-title">Time for a Break!</h2>
-        <p className="break-sub">
-          You've been sitting for a while. Try these stretches:
-        </p>
+      <div className="break-content">
+        <div className="break-breathe-ring">🌿</div>
 
-        <div className="break-stretches">
-          {picks.map((s, i) => (
-            <div key={i} className="break-stretch-card">
-              <span className="break-stretch-emoji">{s.emoji}</span>
-              <div>
-                <div className="break-stretch-name">{s.name}</div>
-                <div className="break-stretch-desc">{s.desc}</div>
-              </div>
-            </div>
-          ))}
+        <div>
+          <div className="break-title">Time for a little break</div>
         </div>
 
+        <div className="break-message">{message}</div>
+
+        <div className="break-breath-hint">Breathe in… and out slowly</div>
+
         <div className="break-actions">
-          <button className="break-btn-snooze" onClick={() => onSnooze(5)}>
-            💤 Snooze 5 min
+          <button className="break-dismiss-btn" onClick={onDismiss}>
+            I'm ready to continue ✓
           </button>
-          <button className="break-btn-done" onClick={onDismiss}>
-            ✅ I Stretched!
+          <button className="break-snooze-btn" onClick={() => onSnooze(5)}>
+            Snooze 5 minutes
           </button>
         </div>
       </div>

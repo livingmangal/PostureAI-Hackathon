@@ -6,8 +6,8 @@ const Navbar = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: "/", label: "POSTURE AI", icon: "🧠" },
-    { path: "/health", label: "HEALTH MODULE", icon: "💊" },
+    { path: "/", label: "Posture Coach", icon: "🧘" },
+    { path: "/health", label: "Wellness Tips", icon: "🌿" },
   ];
 
   return (

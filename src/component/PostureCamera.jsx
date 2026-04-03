@@ -17,6 +17,17 @@ import { getSessions } from "../analytics/storage";
 import SessionSummary from "../features/sessionSummary/SessionSummary";
 import AchievementToast from "../features/gamification/AchievementToast";
 
+// Friendly status emoji map
+const STATUS_EMOJI = {
+  good: "🌿",
+  warning: "🌤",
+  bad: "🌧",
+};
+
+// Warm encouraging toast messages
+const getEncouragingMessage = (issueNames) =>
+  `Hey, let's check your ${issueNames} 🙂`;
+
 export default function PostureCamera({ isPaused, isFullscreen }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -37,7 +48,7 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
   const [streak, setStreak] = useState(0);
   const [goodFrames, setGoodFrames] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
-  const [insight, setInsight] = useState("Warming up sensors…");
+  const [insight, setInsight] = useState("Getting ready for you…");
 
   const streakRef = useRef(0);
   const goodRef = useRef(0);
@@ -147,16 +158,16 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
             }
             setBadPostureTime(newBadTime);
 
+            // Warm encouraging persistent-issue toast
             if (newBadTime > 150 && newBadTime % 150 === 1) {
-              const issueNames = issues.map((i) => i.label).join(" & ");
-              showToast(`Persistent issue: ${issueNames} — correct now!`);
+              const issueNames = issues.map((i) => i.label.toLowerCase()).join(" & ");
+              showToast(getEncouragingMessage(issueNames));
             }
 
             setStreak(streakRef.current);
             setGoodFrames(goodRef.current);
             setInsight(getInsight(Math.round(score), streakRef.current, issues));
 
-            // Record frame for analytics
             sessionTracker.recordFrame(result, score);
           }
         }
@@ -179,7 +190,6 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
     const stats = sessionTracker.getStats();
     saveSession(stats);
 
-    // Check achievements
     const allSessions = getSessions();
     const achContext = {
       totalSessions: allSessions.length,
@@ -213,17 +223,32 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (scoreRounded / 100) * circumference;
 
+  // Warm color for score (sage / amber / blush)
   const scoreColor =
     scoreRounded >= 75
-      ? "var(--accent-green)"
+      ? "var(--accent-sage)"
       : scoreRounded >= 45
-        ? "var(--accent-amber)"
-        : "var(--accent-red)";
+        ? "var(--accent-warm)"
+        : "var(--accent-blush)";
 
   const badgeClass = level === "good" ? "good" : level === "warning" ? "warning" : "bad";
-  const statusDisplay = primary.label === "Detecting…"
-    ? "Detecting…"
-    : `${primary.emoji} ${primary.label}`;
+
+  // Status display with organic emoji
+  const statusEmoji = STATUS_EMOJI[level] ?? "…";
+  const statusDisplay =
+    primary.label === "Detecting…"
+      ? "Getting ready…"
+      : `${statusEmoji} ${primary.label}`;
+
+  // Streak messaging — warm & encouraging
+  const streakMessage =
+    streak >= 60
+      ? "You're glowing ✨"
+      : streak >= 30
+        ? "Keep it up, you're doing great 🌿"
+        : streak >= 10
+          ? "Nice — building momentum"
+          : "Hold steady to build your streak";
 
   return (
     <>
@@ -248,7 +273,7 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
       <div className="toast-container">
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast toast-${toast.type}`}>
-            <span className="toast-icon">⚠️</span>
+            <span className="toast-icon">🌿</span>
             <span>{toast.message}</span>
             <button className="toast-dismiss" onClick={() => dismissToast(toast.id)}>×</button>
           </div>
@@ -261,8 +286,8 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
         <div className={`camera-panel ${isFullscreen ? "camera-fullscreen" : ""}`}>
           <div className="camera-label">
             <div className="camera-label-dot" />
-            Live Feed — Camera 01
-            {isPaused && <span className="camera-paused-badge">⏸ PAUSED</span>}
+            Live session
+            {isPaused && <span className="camera-paused-badge">⏸ Paused</span>}
           </div>
           <div className="camera-wrap">
             <video ref={videoRef} />
@@ -278,9 +303,9 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
             {isCalibrating && (
               <div className="calibrating-overlay">
                 <div className="calibrating-spinner" />
-                <div className="calibrating-text">Calibrating Camera</div>
+                <div className="calibrating-text">Getting ready…</div>
                 <div className="calibrating-sub">
-                  Sit upright and face the camera. Detection will start automatically.
+                  Sit comfortably and face the camera. We'll start shortly 🌿
                 </div>
               </div>
             )}
@@ -307,7 +332,7 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
                   </svg>
                   <div className="score-center">
                     <span className="score-number" style={{ color: scoreColor }}>{scoreRounded}</span>
-                    <span className="score-label">/ 100</span>
+                    <span className="score-label">today</span>
                   </div>
                 </div>
               </div>
@@ -323,18 +348,20 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
                 }}
                 className={`sound-toggle-btn ${isMuted ? "muted" : ""}`}
               >
-                {isMuted ? "🔇 Muted" : "🔊 Sound On"}
+                {isMuted ? "🔇 Muted" : "🔊 Voice on"}
               </button>
               <button className="end-session-btn" onClick={handleEndSession}>
-                📊 End Session
+                🌱 End Session
               </button>
             </div>
 
             {/* Status */}
             <div className="metric-card">
-              <div className="card-label">Current Status</div>
+              <div className="card-label">How you're sitting</div>
               <div className="status-row">
-                <div className={`status-indicator ${badgeClass}`} />
+                <div className={`status-indicator ${badgeClass}`}>
+                  {statusEmoji}
+                </div>
                 <span className={`status-text ${badgeClass}`}>{statusDisplay}</span>
               </div>
 
@@ -352,8 +379,8 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
                 {primary.label !== "Detecting…" ? (
                   <>
                     Neck: {neckAngle.toFixed(1)}°
-                    {shoulderTilt > 0 && <> · Shoulder tilt: {shoulderTilt.toFixed(0)}px</>}
-                    {headTilt > 0 && <> · Head tilt: {headTilt.toFixed(0)}px</>}
+                    {shoulderTilt > 0 && <> · Shoulders: {shoulderTilt.toFixed(0)}px</>}
+                    {headTilt > 0 && <> · Head: {headTilt.toFixed(0)}px</>}
                   </>
                 ) : (
                   "Calibrating…"
@@ -364,32 +391,26 @@ export default function PostureCamera({ isPaused, isFullscreen }) {
                 <div className="accuracy-bar-fill" style={{ width: `${accuracy}%` }} />
               </div>
               <div className="accuracy-label">
-                <span>Session Accuracy</span>
+                <span>Session accuracy</span>
                 <span>{accuracy}%</span>
               </div>
             </div>
 
             {/* Streak */}
             <div className="metric-card">
-              <div className="card-label">Good Posture Streak</div>
+              <div className="card-label">Good posture streak</div>
               <div className="streak-row">
                 <span className="streak-number">{streak}</span>
-                <span className="streak-unit">FRAMES</span>
+                <span className="streak-unit">good frames in a row</span>
               </div>
-              <div className="streak-sub">
-                {streak >= 30
-                  ? "🔥 On fire!"
-                  : streak >= 10
-                    ? "⚡ Building momentum"
-                    : "Hold steady to build streak"}
-              </div>
+              <div className="streak-sub">{streakMessage}</div>
             </div>
 
             {/* Insight */}
             <div className="metric-card">
-              <div className="card-label">AI Insight</div>
+              <div className="card-label">A little nudge</div>
               <span className="insight-icon">
-                {scoreRounded >= 80 ? "✅" : scoreRounded >= 50 ? "⚠️" : "🚨"}
+                {scoreRounded >= 80 ? "🌿" : scoreRounded >= 50 ? "🌤" : "🌧"}
               </span>
               <div className="insight-text">{insight}</div>
             </div>

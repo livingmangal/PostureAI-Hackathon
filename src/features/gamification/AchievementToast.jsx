@@ -14,12 +14,12 @@ export default function AchievementToast({ achievements, onDone }) {
         setTimeout(() => {
           setExiting(false);
           setCurrent((p) => p + 1);
-        }, 300);
+        }, 350);
       } else {
         setExiting(true);
-        setTimeout(() => onDone?.(), 300);
+        setTimeout(() => onDone?.(), 350);
       }
-    }, 3000);
+    }, 3500);
 
     return () => clearTimeout(timer);
   }, [current, achievements, onDone]);
@@ -33,7 +33,7 @@ export default function AchievementToast({ achievements, onDone }) {
       <div className="ach-toast-glow" />
       <span className="ach-toast-emoji">{ach.emoji}</span>
       <div className="ach-toast-content">
-        <div className="ach-toast-label">Achievement Unlocked!</div>
+        <div className="ach-toast-label">✨ You earned something nice</div>
         <div className="ach-toast-title">{ach.title}</div>
         <div className="ach-toast-desc">{ach.desc}</div>
       </div>

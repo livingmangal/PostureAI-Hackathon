@@ -10,13 +10,12 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 export default function Dashboard() {
   const { settings } = useSettings();
 
-  // ── Lifted state (shared between shortcuts & PostureCamera) ──
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [calmMode, setCalmMode] = useState(false);
 
-  // Break timer
   const {
     timeFormatted,
     isBreakTime,
@@ -24,7 +23,6 @@ export default function Dashboard() {
     reset: resetBreak,
   } = useBreakTimer(settings.breakEnabled ? settings.breakInterval * 60 * 1000 : Infinity);
 
-  // ── Keyboard shortcuts — all handlers wired up ──
   const shortcutHandlers = useMemo(
     () => ({
       onToggleMute: () => {
@@ -45,37 +43,50 @@ export default function Dashboard() {
   );
   useKeyboardShortcuts(shortcutHandlers);
 
+  // Apply calm mode class to the app-shell
+  useMemo(() => {
+    const shell = document.querySelector('.app-shell');
+    if (shell) {
+      if (calmMode) shell.classList.add('calm-mode');
+      else shell.classList.remove('calm-mode');
+    }
+  }, [calmMode]);
+
   return (
     <div className="app-content">
       <ScrollToTop />
 
-      {/* Break overlay */}
       {isBreakTime && settings.breakEnabled && (
         <BreakOverlay onSnooze={snooze} onDismiss={resetBreak} />
       )}
 
-      {/* Settings drawer */}
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Header */}
       <header className="status-bar">
         <div className="brand">
-          <div className="brand-icon">🧠</div>
+          <div className="brand-icon">🧘</div>
           <div>
-            <div className="brand-name">PostureAI</div>
-            <div className="brand-tag">Real-time Analysis</div>
+            <div className="brand-name">PostureCoach</div>
+            <div className="brand-tag">Your quiet companion</div>
           </div>
         </div>
 
         <div className="status-indicators">
           <div className="indicator">
             <div className="indicator-dot" />
-            {isPaused ? "PAUSED" : "LIVE"}
+            {isPaused ? "Paused" : "Watching"}
           </div>
           {settings.breakEnabled && (
-            <div className="indicator">⏰ {timeFormatted}</div>
+            <div className="indicator">🍃 {timeFormatted}</div>
           )}
-          <div className="indicator">MODEL · MOVENET</div>
+          <button
+            className={`calm-mode-btn ${calmMode ? "active" : ""}`}
+            onClick={() => setCalmMode((c) => !c)}
+            title="Toggle calming mode"
+          >
+            {calmMode ? "🌙 Calm" : "☀️ Bright"}
+          </button>
           <button
             className="settings-btn"
             onClick={() => setSettingsOpen(true)}

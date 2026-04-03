@@ -1,8 +1,14 @@
 import { useEffect } from "react";
 import "./SessionSummary.css";
 
+const getSubtitle = (avgScore) => {
+  if (avgScore >= 80) return "You did beautifully today 🌿 Keep it up.";
+  if (avgScore >= 60) return "A solid session — you're building good habits.";
+  if (avgScore >= 40) return "Every session counts. You showed up — that's what matters.";
+  return "It's okay. Tomorrow is a fresh start 🌱";
+};
+
 export default function SessionSummary({ stats, onClose, onExport }) {
-  // Close on Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -23,8 +29,8 @@ export default function SessionSummary({ stats, onClose, onExport }) {
         <button className="ss-close" onClick={onClose}>×</button>
 
         <div className="ss-header">
-          <div className="ss-title">Session Complete</div>
-          <div className="ss-subtitle">Here's how you did</div>
+          <div className="ss-title">Session complete</div>
+          <div className="ss-subtitle">{getSubtitle(stats.avgScore)}</div>
         </div>
 
         {/* Stats Grid */}
@@ -43,9 +49,9 @@ export default function SessionSummary({ stats, onClose, onExport }) {
           </div>
         </div>
 
-        {/* Accuracy Breakdown */}
+        {/* Posture Breakdown */}
         <div className="ss-breakdown">
-          <div className="ss-breakdown-label">Posture Breakdown</div>
+          <div className="ss-breakdown-label">Posture breakdown</div>
           <div className="ss-bar">
             <div className="ss-bar-good" style={{ width: `${stats.goodPercent}%` }} />
             <div className="ss-bar-warning" style={{ width: `${stats.warningPercent}%` }} />
@@ -53,15 +59,15 @@ export default function SessionSummary({ stats, onClose, onExport }) {
           </div>
           <div className="ss-bar-legend">
             <span><span className="ss-dot good" /> Good {stats.goodPercent}%</span>
-            <span><span className="ss-dot warning" /> Warning {stats.warningPercent}%</span>
-            <span><span className="ss-dot bad" /> Bad {stats.badPercent}%</span>
+            <span><span className="ss-dot warning" /> Fair {stats.warningPercent}%</span>
+            <span><span className="ss-dot bad" /> Needs work {stats.badPercent}%</span>
           </div>
         </div>
 
-        {/* Timeline Heatmap */}
+        {/* Timeline */}
         {stats.timeline.length > 0 && (
           <div className="ss-timeline-section">
-            <div className="ss-breakdown-label">Session Timeline</div>
+            <div className="ss-breakdown-label">Your session journey</div>
             <div className="ss-timeline">
               {stats.timeline.map((level, i) => (
                 <div key={i} className={`ss-timeline-block ${level}`} />
@@ -77,7 +83,7 @@ export default function SessionSummary({ stats, onClose, onExport }) {
         {/* Top Issues */}
         {stats.topIssues.length > 0 && (
           <div className="ss-issues">
-            <div className="ss-breakdown-label">Top Issues</div>
+            <div className="ss-breakdown-label">Areas to focus on</div>
             {stats.topIssues.map((issue, i) => (
               <div key={i} className="ss-issue-row">
                 <span className="ss-issue-name">{issue.label}</span>
@@ -96,7 +102,7 @@ export default function SessionSummary({ stats, onClose, onExport }) {
         {/* Actions */}
         <div className="ss-actions">
           <button className="ss-btn-export" onClick={onExport}>
-            📥 Export CSV
+            Save your report
           </button>
           <button className="ss-btn-close" onClick={onClose}>
             Continue

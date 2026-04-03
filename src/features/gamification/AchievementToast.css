@@ -1,84 +1,83 @@
-/* Achievement Toast */
+/* ═══════════════════════════════════════════
+   ACHIEVEMENT TOAST — Warm & Celebratory
+═══════════════════════════════════════════ */
+
 .ach-toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 9500;
+  z-index: 9000;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px 28px;
-  background: rgba(10, 22, 40, 0.9);
-  border: 1px solid rgba(251, 191, 36, 0.4);
+  padding: 18px 26px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hover);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 0 40px rgba(251, 191, 36, 0.15), 0 16px 40px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-xl);
   animation: achSlideUp 0.5s var(--ease-spring) both;
-  max-width: 440px;
+  min-width: 300px;
+  max-width: 400px;
+  border-left: 3px solid var(--accent-gold);
 }
 
 .ach-toast-glow {
   position: absolute;
-  inset: -2px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(251,191,36,0.3), rgba(34,211,165,0.3));
-  opacity: 0;
-  animation: achGlow 2s ease-in-out infinite;
-  z-index: -1;
-  filter: blur(8px);
-}
-
-@keyframes achGlow {
-  0%, 100% { opacity: 0.3; }
-  50%      { opacity: 0.6; }
-}
-
-@keyframes achSlideUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(30px) scale(0.95); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 20% 50%, rgba(201, 169, 110, 0.08) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .ach-exit {
-  animation: achSlideOut 0.3s ease forwards;
+  animation: achSlideOut 0.35s var(--ease-organic) forwards;
+}
+
+@keyframes achSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 @keyframes achSlideOut {
-  to { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.95); }
+  to { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.96); }
 }
 
 .ach-toast-emoji {
-  font-size: 36px;
+  font-size: 32px;
+  animation: gentlePop 0.6s var(--ease-spring) both;
+  animation-delay: 0.2s;
   flex-shrink: 0;
-  animation: achEmojiBounce 0.6s var(--ease-spring) 0.3s both;
 }
 
-@keyframes achEmojiBounce {
-  from { transform: scale(0); }
-  to   { transform: scale(1); }
+@keyframes gentlePop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
 }
 
-.ach-toast-content { flex: 1; }
+.ach-toast-content {
+  flex: 1;
+}
 
 .ach-toast-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 2px;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  color: var(--accent-amber);
-  margin-bottom: 4px;
+  letter-spacing: 0.06em;
+  color: var(--accent-gold);
+  margin-bottom: 3px;
 }
 
 .ach-toast-title {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
   margin-bottom: 2px;
 }
 
 .ach-toast-desc {
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.5;
 }
