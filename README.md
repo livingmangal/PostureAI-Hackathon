@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 PostureAI
+# 🧠 PostureCoach
 
 ### Real-Time AI-Powered Posture Analysis
 
@@ -9,7 +9,7 @@
 [![Built with Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3a5.svg)](LICENSE)
 
-**PostureAI** uses your webcam and on-device machine learning to detect **7 posture issues** in real-time — no server, no data leaves your browser. Featuring a gamified health module, session analytics, break reminders, and a fully customizable settings panel.
+**PostureCoach** uses your webcam and on-device machine learning to detect **7 posture issues** in real-time — no server, no data leaves your browser. Designed as a **calm, supportive digital coach**, it features a warm, human-centered interface, gamified health tracking, gentle break reminders, and a fully customizable settings panel.
 
 [Getting Started](#-getting-started) · [Features](#-features) · [Architecture](#-architecture) · [Adding Detectors](#-adding-a-new-detector) · [Keyboard Shortcuts](#-keyboard-shortcuts)
 
@@ -21,7 +21,7 @@
 
 ### 🎯 Multi-Posture Detection Engine
 
-PostureAI classifies **7 distinct posture issues** across a 3-tier severity system:
+PostureCoach classifies **7 distinct posture issues** across a 3-tier severity system:
 
 | Issue | Severity | Detection Method |
 |:------|:--------:|:-----------------|
@@ -64,12 +64,12 @@ PostureAI classifies **7 distinct posture issues** across a 3-tier severity syst
 - Interactive posture quiz with instant feedback
 - Embedded video resources and daily habit checklist
 
-### 🎨 Premium UI/UX
-- **Dark futuristic theme** with glassmorphism and animated aurora background
-- **3-color skeleton overlay** — green (good), amber (warning), red (bad)
-- **Dashed neck guide line** showing the exact angle being measured
-- Toast notifications, calibration overlay, responsive design
-- Custom-styled scrollbar, Google Fonts (Inter, Outfit, Space Mono)
+### 🎨 Premium Calm UI/UX
+- **Warm, human-centered design** with soft shadows, organic easing, and an ambient slow-drift gradient background
+- **Calming Mode** — low-contrast, dimmed UI toggle for deep focus sessions
+- 🧘‍♂️ **Supportive, non-judgmental status indicators** and gentle breathing animations instead of clinical "alarms"
+- Toast notifications, immersive break overlays, and responsive design
+- Google Fonts (DM Sans, DM Mono) for a friendly, approachable feel
 
 ---
 
@@ -107,7 +107,7 @@ npm run preview
 
 ## 🏗 Architecture
 
-PostureAI follows a **modular, single-responsibility architecture**. Each concern is isolated into its own file or directory.
+PostureCoach follows a **modular, single-responsibility architecture**. Each concern is isolated into its own file or directory.
 
 ```
 src/
@@ -234,7 +234,7 @@ That's it — the UI, voice alerts, scoring, and analytics automatically pick up
 | **AI Model** | TensorFlow.js + MoveNet (SinglePose Lightning) |
 | **Routing** | React Router 7 |
 | **Styling** | Vanilla CSS with CSS custom properties |
-| **Fonts** | Google Fonts (Inter, Outfit, Space Mono, Bebas Neue) |
+| **Fonts** | Google Fonts (DM Sans, DM Mono) |
 | **Persistence** | localStorage (settings, sessions, achievements) |
 | **Voice** | Web Speech API (SpeechSynthesisUtterance) |
 
@@ -242,7 +242,7 @@ That's it — the UI, voice alerts, scoring, and analytics automatically pick up
 
 ## 🔒 Privacy
 
-PostureAI runs **100% on-device**. Your webcam feed is processed locally by TensorFlow.js inside your browser. No video, keypoints, or posture data is ever sent to any external server. Session data is stored only in your browser's localStorage.
+PostureCoach runs **100% on-device**. Your webcam feed is processed locally by TensorFlow.js inside your browser. No video, keypoints, or posture data is ever sent to any external server. Session data is stored only in your browser's localStorage.
 
 ---
 
@@ -256,6 +256,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 **Built using TensorFlow.js + MoveNet**
 
-*PostureAI — Sit tall. Live well.*
+*PostureCoach — Sit tall. Live well.*
 
 </div>
